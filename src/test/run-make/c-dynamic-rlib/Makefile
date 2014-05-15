@@ -1,7 +1,7 @@
 -include ../tools.mk
 
 # This overrides the LD_LIBRARY_PATH for RUN
-TARGET_RPATH_ENV:=$(TARGET_RPATH_ENV):$(TMPDIR)
+TARGET_RPATH_DIR:=$(TARGET_RPATH_DIR):$(TMPDIR)
 
 # This hits an assertion in the linker on older versions of osx apparently
 ifeq ($(shell uname),Darwin)

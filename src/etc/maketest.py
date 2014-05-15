@@ -30,17 +30,10 @@ def putenv(name, value):
         value = normalize_path(value)
     os.putenv(name, value)
 
-def convert_path_spec(name_and_value):
-    name = name_and_value.split('=')[0]
-    value = name_and_value.split('=')[1]
+def convert_path_spec(name, value):
     if os.name == 'nt' and name != 'PATH':
         value = ":".join(normalize_path(v) for v in value.split(";"))
-    return (name, value)
-
-def put_delayed_env_setting(carrier_name, setting):
-    if setting != '':
-        delayed_name, value = convert_path_spec(setting)
-        os.putenv(carrier_name, delayed_name + '=' + value)
+    return value
 
 make = sys.argv[2]
 putenv('RUSTC', os.path.abspath(sys.argv[3]))
@@ -48,9 +41,11 @@ putenv('TMPDIR', os.path.abspath(sys.argv[4]))
 putenv('CC', sys.argv[5])
 putenv('RUSTDOC', os.path.abspath(sys.argv[6]))
 filt = sys.argv[7]
-put_delayed_env_setting('HOST_RPATH_ENV', sys.argv[8])
-put_delayed_env_setting('TARGET_RPATH_ENV', sys.argv[9])
-putenv('RUST_BUILD_STAGE', sys.argv[10])
+rpath_var = sys.argv[8];
+putenv('LD_LIB_PATH_ENVVAR', rpath_var);
+putenv('HOST_RPATH_DIR', convert_path_spec(rpath_var, sys.argv[9]));
+putenv('TARGET_RPATH_DIR', convert_path_spec(rpath_var, sys.argv[10]));
+putenv('RUST_BUILD_STAGE', sys.argv[11])
 
 if not filt in sys.argv[1]:
     sys.exit(0)

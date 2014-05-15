@@ -2,7 +2,7 @@
 
 HOST_LIB_DIR=$(TMPDIR)/../../../stage$(RUST_BUILD_STAGE)/lib
 # This overrides the LD_LIBRARY_PATH for RUN
-TARGET_RPATH_ENV:=$(TARGET_RPATH_ENV):$(TMPDIR)
+TARGET_RPATH_DIR:=$(TARGET_RPATH_DIR):$(TMPDIR)
 
 all:
 	$(RUSTC) lib.rs
