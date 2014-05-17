@@ -5,6 +5,7 @@ HOST_LIB_DIR=$(TMPDIR)/../../../stage$(RUST_BUILD_STAGE)/lib
 TARGET_RPATH_DIR:=$(TARGET_RPATH_DIR):$(TMPDIR)
 
 all:
+	env
 	$(RUSTC) lib.rs
 	ln -nsf $(call DYLIB,boot-*) $(call DYLIB,boot)
 	$(CC) main.c -o $(call RUN_BINFILE,main) $(call RPATH_LINK_SEARCH,$(HOST_LIB_DIR)) -lboot

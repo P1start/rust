@@ -41,10 +41,9 @@ putenv('TMPDIR', os.path.abspath(sys.argv[4]))
 putenv('CC', sys.argv[5])
 putenv('RUSTDOC', os.path.abspath(sys.argv[6]))
 filt = sys.argv[7]
-rpath_var = sys.argv[8];
-putenv('LD_LIB_PATH_ENVVAR', rpath_var);
-putenv('HOST_RPATH_DIR', convert_path_spec(rpath_var, sys.argv[9]));
-putenv('TARGET_RPATH_DIR', convert_path_spec(rpath_var, sys.argv[10]));
+putenv('LD_LIB_PATH_ENVVAR', sys.argv[8]);
+putenv('HOST_RPATH_DIR', os.path.abspath(sys.argv[9]));
+putenv('TARGET_RPATH_DIR', os.path.abspath(sys.argv[10]));
 putenv('RUST_BUILD_STAGE', sys.argv[11])
 
 if not filt in sys.argv[1]:
