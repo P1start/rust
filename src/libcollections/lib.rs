@@ -51,6 +51,7 @@ pub use string::String;
 pub use treemap::{TreeMap, TreeSet};
 pub use trie::{TrieMap, TrieSet};
 pub use vec::Vec;
+pub use rope::{Rope, VecRope};
 
 mod macros;
 
@@ -68,6 +69,7 @@ pub mod str;
 pub mod string;
 pub mod vec;
 pub mod hash;
+pub mod rope;
 
 // Internal unicode fiddly bits for the str module
 mod unicode;
