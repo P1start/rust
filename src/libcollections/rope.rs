@@ -292,34 +292,46 @@ impl<T> VecRopeTree<T> {
         (tree, iter.fold(first, |x, y| x.append(y)))
     }
 
+    fn total_weight(&self) -> uint {
+        match *self {
+           Branch(len, _, _, ref r) => {
+               len + r.total_weight()
+           }
+           Leaf(len, _) => {
+               len
+           }
+        }
+    }
+
     fn append(self, other: VecRopeTree<T>) -> VecRopeTree<T> {
         match self {
-            Branch(len, height, l, r) => {
+            Branch(len, depth, l, r) => {
                 match other {
-                    Branch(o_len, o_height, o_l, o_r) => {
-                        // Branch + Branch
-                        let new_height = std::cmp::max(height, o_height);
-                        Branch(len, new_height + 1,
-                               box Branch(len, height, l, r),
-                               box Branch(o_len, o_height, o_l, o_r))
+                    Branch(o_len, o_depth, o_l, o_r) => {
+                    // Branch + Branch
+                        let new_depth = std::cmp::max(depth, o_depth);
+                        Branch(len + r.total_weight(), new_depth + 1,
+                               box Branch(len, depth, l, r),
+                               box Branch(o_len, o_depth, o_l, o_r))
                     }
                     Leaf(o_len, o_v) => {
                         // Branch + Leaf
                         match r {
                             box r_br @ Branch(..) => {
-                                Branch(len, height + 1,
-                                       box Branch(len, height, l, box r_br),
+                                Branch(len + r_br.total_weight(), depth + 1,
+                                       box Branch(len, depth, l, box r_br),
                                        box Leaf(o_len, o_v))
                             }
                             box Leaf(self_r_len, mut self_r_v) => {
                                 let result_len = o_len + self_r_len;
                                 if result_len <= MAX_VEC_LEN {
                                     self_r_v.extend(o_v.move_iter());
-                                    Branch(result_len, height, l,
-                                           box Leaf(result_len,  self_r_v))
-                                } else {
-                                    Branch(len, height + 1,
-                                           box Branch(len, height, l, box Leaf(self_r_len, self_r_v)),
+                                    Branch(len, depth, l,
+                                           box Leaf(result_len, self_r_v))
+                                }
+                                else {
+                                    Branch(len + self_r_len, depth + 1,
+                                           box Branch(len, depth, l, box Leaf(self_r_len, self_r_v)),
                                            box Leaf(o_len, o_v))
                                 }
                             }
@@ -329,11 +341,11 @@ impl<T> VecRopeTree<T> {
             },
             Leaf(len, mut self_v) => {
                 match other {
-                    Branch(o_len, o_height, o_l, o_r) => {
-                        // Leaf + Branch
-                        Branch(len, o_height + 1,
-                               box Leaf(len, self_v),
-                               box Branch(o_len, o_height, o_l, o_r))
+                    // Leaf + Branch
+                    Branch(o_len, o_depth, o_l, o_r) => {
+                        Branch(len, o_depth + 1,
+                                box Leaf(len, self_v),
+                                box Branch(o_len, o_depth, o_l, o_r))
                     }
                     Leaf(o_len, o_v) => {
                         // Leaf + Leaf
