@@ -20,7 +20,7 @@
        html_playground_url = "http://play.rust-lang.org/")]
 
 #![feature(macro_rules, managed_boxes, default_type_params, phase, globs)]
-#![feature(unsafe_destructor, import_shadowing)]
+#![feature(unsafe_destructor, import_shadowing, tuple_indexing)]
 #![no_std]
 
 #[phase(plugin, link)] extern crate core;
@@ -48,6 +48,7 @@ pub use string::String;
 pub use treemap::{TreeMap, TreeSet};
 pub use trie::{TrieMap, TrieSet};
 pub use vec::Vec;
+pub use rope::Rope;
 
 mod macros;
 
@@ -65,6 +66,7 @@ pub mod str;
 pub mod string;
 pub mod vec;
 pub mod hash;
+pub mod rope;
 
 mod deque;
 
