@@ -219,6 +219,7 @@ pub type VecRopeItems<'a, T> = FlatMap<'a, &'a [T], VecRopeNodeItems<'a, T>,
                                                     Items<'a, T>>;
 
 static MAX_VEC_LEN: uint = 100;
+static MAX_DEPTH: uint = 100;
 
 impl<T> VecRopeTree<T> {
     fn height(&self) -> uint {
@@ -292,47 +293,34 @@ impl<T> VecRopeTree<T> {
         (tree, iter.fold(first, |x, y| x.append(y)))
     }
 
-    fn total_weight(&self) -> uint {
-        match *self {
-           Branch(len, _, _, ref r) => {
-               len + r.total_weight()
-           }
-           Leaf(len, _) => {
-               len
-           }
-        }
-    }
-
     fn append(self, other: VecRopeTree<T>) -> VecRopeTree<T> {
         match self {
             Branch(len, depth, l, r) => {
                 match other {
                     Branch(o_len, o_depth, o_l, o_r) => {
-                    // Branch + Branch
                         let new_depth = std::cmp::max(depth, o_depth);
-                        Branch(len + r.total_weight(), new_depth + 1,
+                        Branch(len + r.len(), new_depth + 1,
                                box Branch(len, depth, l, r),
-                               box Branch(o_len, o_depth, o_l, o_r))
+                               box Branch(o_len, o_depth, o_l, o_r)).balance()
                     }
                     Leaf(o_len, o_v) => {
-                        // Branch + Leaf
                         match r {
                             box r_br @ Branch(..) => {
-                                Branch(len + r_br.total_weight(), depth + 1,
+                                Branch(len + r_br.len(), depth + 1,
                                        box Branch(len, depth, l, box r_br),
-                                       box Leaf(o_len, o_v))
+                                       box Leaf(o_len, o_v)).balance()
                             }
                             box Leaf(self_r_len, mut self_r_v) => {
                                 let result_len = o_len + self_r_len;
                                 if result_len <= MAX_VEC_LEN {
                                     self_r_v.extend(o_v.move_iter());
                                     Branch(len, depth, l,
-                                           box Leaf(result_len, self_r_v))
+                                           box Leaf(result_len, self_r_v)).balance()
                                 }
                                 else {
                                     Branch(len + self_r_len, depth + 1,
                                            box Branch(len, depth, l, box Leaf(self_r_len, self_r_v)),
-                                           box Leaf(o_len, o_v))
+                                           box Leaf(o_len, o_v)).balance()
                                 }
                             }
                         }
@@ -341,22 +329,21 @@ impl<T> VecRopeTree<T> {
             },
             Leaf(len, mut self_v) => {
                 match other {
-                    // Leaf + Branch
                     Branch(o_len, o_depth, o_l, o_r) => {
                         Branch(len, o_depth + 1,
                                 box Leaf(len, self_v),
-                                box Branch(o_len, o_depth, o_l, o_r))
+                                box Branch(o_len, o_depth, o_l, o_r)).balance()
                     }
                     Leaf(o_len, o_v) => {
-                        // Leaf + Leaf
                         let result_len = o_len + len;
                         if result_len <= MAX_VEC_LEN {
                             self_v.extend(o_v.move_iter());
-                            Leaf(result_len, self_v)
-                        } else {
+                            Leaf(result_len, self_v).balance()
+                        }
+                        else {
                             Branch(len, 1,
                                    box Leaf(len, self_v),
-                                   box Leaf(o_len, o_v))
+                                   box Leaf(o_len, o_v)).balance()
                         }
                     }
                 }
@@ -370,6 +357,200 @@ impl<T> VecRopeTree<T> {
 
     fn iter<'a>(&'a self) -> VecRopeItems<'a, T> {
         self.node_iter().flat_map(|x| x.iter())
+    }
+
+    //Create a fibonacci tree for minimum length usage in balancing
+    //The purpose of this is to find the "minimum length" threshold
+    pub fn balance_init_minlen() -> Vec<uint> {
+        let mut vec : Vec<uint> = vec!(1, 2);
+        let mut prev : uint = 1;
+        let mut last : uint = 2;
+
+        for _ in range(0, MAX_DEPTH) {
+        //for _ in range(0, MAX_DEPTH) {
+           let current = last + prev;
+           vec.push(current);
+           prev = last;
+           last = current;
+        }
+        vec
+    }
+
+    //Create the forest vector of size MAX_DEPTH
+    fn balance_init_forest(min_len : &Vec<uint>, max_len: uint) -> Vec<Option<VecRopeTree<T>>> {
+        let mut forest: Vec<Option<VecRopeTree<T>>> = Vec::new();
+        //for i in range(0, MAX_DEPTH) {
+        for i in range(0, MAX_DEPTH) {
+            forest.push(None);
+            /*
+            if *min_len.get(i) > max_len {
+                return forest;
+            }*/
+            //TODO add a conditional to check and see if cord is too long or not
+        }
+        forest
+    }
+
+    fn balance_insert_add_forest(self, min_len: &Vec<uint>,
+                                 mut forest: Vec<Option<VecRopeTree<T>>>) 
+                                 -> Vec<Option<VecRopeTree<T>>> {
+        let mut n: uint;
+        let mut sum: Option<VecRopeTree<T>> = None; 
+        let len = self.len();
+
+        if forest.len() > 0 {
+            //@Precondition: Sum has the first element available 
+            //@Postcondition: Sum now has elements of all the elements in forest
+            //Populate the sum with all the elements of the current forest.
+            n = 0;
+            while len > *(min_len.get(n + 1)) {
+                //get the current tree from the forest and append it with sum.
+                let opt_forest_element = forest.get_mut(n).take();
+                sum = match sum {
+                    //Because the forestElement is dfs traversed, it is always
+                    //bfr the current sum to be added, append bfr it
+                    Some(u_sum) => {
+                        match opt_forest_element {
+                            Some(some_forest_ele) =>  {
+                                let appended_ele = some_forest_ele.append(u_sum);
+                                Some(appended_ele)
+                            }
+                            None => Some(u_sum)
+                        }
+                    }
+                    None => {
+                        match opt_forest_element {
+                            Some(some_forest_ele) => Some(some_forest_ele),
+                            None => None
+                        }
+                    }
+                };
+                n = n + 1;
+            }
+
+            //Finally concat the sum from the forests and the new cord
+            let mut sum_len;
+            sum = match sum {
+                Some(u_sum) => {
+                    sum_len = u_sum.len() + len;
+                    Some(u_sum.append(self))
+                },
+                None => {
+                    sum_len = self.len();
+                    Some(self)
+                }
+            };
+            //@Precondition: Sum contains the concatted sum word with concat
+            //@Postcondition: Forest now has a new value.
+            //While the new summed len is greater/equal to the fibo tree curr
+            // minlen
+            while sum_len >= *min_len.get(n) {
+                let opt_forest_element = forest.get_mut(n).take();
+                sum = match sum {
+                    //Because the forestElement is dfs traversed, it is always
+                    //bfr the current sum to be added, append bfr it
+                    Some(u_sum) => {
+                        match opt_forest_element {
+                            Some(some_forest_ele) =>  {
+                                let appended_ele = some_forest_ele.append(u_sum);
+                                sum_len = appended_ele.len();
+                                Some(appended_ele)
+                            }
+                            None => Some(u_sum)
+                        }
+                    }
+                    None => {
+                        match opt_forest_element {
+                            Some(some_forest_ele) => {
+                                sum_len = some_forest_ele.len();
+                                Some(some_forest_ele)
+                            }
+                            None => None
+                        }
+                    }
+                };
+                n = n + 1;
+            }
+            n = n - 1;
+            let forestNode = Some(sum.unwrap());
+            replace(forest.get_mut(n), forestNode);
+        }
+        forest
+    }
+
+    //Check each node to see if they need to be balanced during the operation and
+    //adding to the forest, putting bigger and more recent node subtrees
+    //into the latter portions of the forest and smaller node subtrees in the earlier parts
+    //to be rebalanced
+    fn balance_insert(self, len : uint, min_len: &Vec<uint>,
+                        forest: Vec<Option<VecRopeTree<T>>>)
+                        -> Vec<Option<VecRopeTree<T>>> {
+        match self {
+            Branch(_, depth, l, r) => {
+                //Check the depth of the current cord whether or not it requires
+                //extensive node shuffling in order to balance it
+                if depth >= MAX_DEPTH || len < *min_len.get(depth) {
+                    let l_len = l.len();
+
+                    let forest_l = l.balance_insert(l_len, min_len, forest);
+                    r.balance_insert(len - l_len, min_len, forest_l)
+                }
+                else {
+                    Branch(len, depth, l, r).
+                        balance_insert_add_forest(min_len, forest)
+                }
+            }
+            lf @ Leaf(..) => {
+                lf.balance_insert_add_forest(min_len, forest)
+            }
+        }
+    }
+
+    fn balance_concat_forest(mut forest: Vec<Option<VecRopeTree<T>>>,
+     len: uint) -> VecRopeTree<T> {
+        //while were adding up, we expect it to be a sum_len
+        let mut n = 0;
+        let mut sum:Option<VecRopeTree<T>> = None;
+        let mut sum_len = 0;
+        
+        while sum_len != len {
+            let forestElement = forest.get_mut(n).take();
+            sum = match sum {
+                Some(u_sum) => {
+                    let appendedEle = forestElement.unwrap().append(u_sum);
+                    sum_len = appendedEle.len();
+                    Some(appendedEle)
+                }
+                None => {
+                    let ele = forestElement.unwrap();
+                    sum_len = ele.len();
+                    Some(ele)
+                }
+            };
+            n = n + 1;
+        }
+        sum.unwrap()
+    }
+
+    //Balance the forest according to the paper: Ropes: an Alternative to Strings, pages 5 - 6
+    //This is extremely similar to the implementation done by Ivan Maidanski:
+    //https://github.com/ivmai/bdwgc/blob/f6f4d1563b27af7e05ffe9ed676aff448b38c40e/cord/cordbscs.c
+    fn balance(self) -> VecRopeTree<T> {
+        match self {
+            Branch(len, depth, l, r) => {
+                if depth < MAX_DEPTH {
+                    return Branch(len, depth, l, r);
+                }
+                let min_len = VecRopeTree::<T>::balance_init_minlen();
+                //initiate the forest
+                let forest = VecRopeTree::<T>::balance_init_forest(&min_len, len); 
+                //finally insert the x node
+                let new_forest = Branch(len, depth, l, r).balance_insert(len, &min_len, forest);
+                VecRopeTree::<T>::balance_concat_forest(new_forest, len)
+            }
+            //If String, return
+            Leaf(len, self_v) => Leaf(len, self_v)
+        }
     }
 }
 
