@@ -71,15 +71,24 @@ impl<A> Future<A> {
         * to the result.  The reference lasts as long as
         * the future.
         */
+        self.get_mut()
+    }
+
+    pub fn get_mut<'a>(&'a mut self) -> &'a mut A {
+        /*!
+        * Executes the future's closure and then returns a mutable reference
+        * to the result. The reference lasts as long as
+        * the future.
+        */
         match self.state {
-            Forced(ref v) => return v,
+            Forced(ref mut v) => return v,
             Evaluating => panic!("Recursive forcing of future!"),
             Pending(_) => {
                 match replace(&mut self.state, Evaluating) {
                     Forced(_) | Evaluating => panic!("Logic error."),
                     Pending(f) => {
                         self.state = Forced(f());
-                        self.get_ref()
+                        self.get_mut()
                     }
                 }
             }
@@ -186,6 +195,13 @@ mod test {
     fn test_get_ref_method() {
         let mut f = Future::from_value(22i);
         assert_eq!(*f.get_ref(), 22);
+    }
+
+    #[test]
+    fn test_get_mut_method() {
+        let mut f = Future::from_value(22i);
+        *f.get_mut() = 45;
+        assert_eq!(*f.get_ref(), 45);
     }
 
     #[test]
